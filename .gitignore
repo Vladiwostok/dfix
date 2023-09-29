@@ -8,4 +8,4 @@ test/testfile.d
 dfix
 dub.selections.json
 
-idea/
+.idea/

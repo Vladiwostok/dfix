@@ -7,7 +7,7 @@ FLAGS := -Ilibdparse/src/\
 	-dip25\
 	-ofbin/dfix
 
-FILES := src/dfix.d \
+FILES := src/* \
 	$(shell find libdparse/src/ -name "*.d") \
 	$(shell find stdx-allocator/source/ -name "*.d")
 
