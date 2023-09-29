@@ -28,12 +28,7 @@ int main(string[] args)
 
 	try
 	{
-		getopt(args,
-			"dip64", &dip64,
-			"dip65", &dip65,
-			"dip1003", &dip1003,
-			"help|h", &help,
-		);
+		getopt(args, "dip64", &dip64, "dip65", &dip65, "dip1003", &dip1003, "help|h", &help);
 	}
 	catch (Exception e)
 	{
@@ -69,9 +64,9 @@ int main(string[] args)
 	foreach (f; parallel(files))
 	{
 		try
-			upgradeFile(f, dip64, dip65, dip1003);
+		upgradeFile(f, dip64, dip65, dip1003);
 		catch (Exception e)
-			stderr.writeln("Failed to upgrade ", f, ":(", e.file, ":", e.line, ") ", e.msg);
+		stderr.writeln("Failed to upgrade ", f, ":(", e.file, ":", e.line, ") ", e.msg);
 	}
 
 	return 0;
@@ -131,7 +126,7 @@ void upgradeFile(string fileName, bool dip64, bool dip65, bool dip1003)
 	config.stringBehavior = StringBehavior.source;
 	auto tokens = byToken(inputBytes, config, &cache).array;
 	auto parseTokens = tokens.filter!(a => a != tok!"whitespace"
-		&& a != tok!"comment" && a != tok!"specialTokenSequence").array;
+	&& a != tok!"comment" && a != tok!"specialTokenSequence").array;
 
 	RollbackAllocator allocator;
 	uint errorCount;
@@ -139,7 +134,7 @@ void upgradeFile(string fileName, bool dip64, bool dip65, bool dip1003)
 	if (errorCount > 0)
 	{
 		stderr.writefln("%d parse errors encountered. Aborting upgrade of %s",
-			errorCount, fileName);
+		errorCount, fileName);
 		return;
 	}
 
@@ -159,9 +154,8 @@ void upgradeFile(string fileName, bool dip64, bool dip65, bool dip1003)
 			writeToken(output, tokens[i]);
 			i++;
 		}
-		else if ((tokens[i] == tok!"const" || tokens[i] == tok!"immutable"
-				|| tokens[i] == tok!"shared" || tokens[i] == tok!"inout")
-				&& tokens[i + 1] == tok!"(")
+		else if ((tokens[i] == tok!"const" || tokens[i] == tok!"immutable" || tokens[i] == tok!"shared"
+		|| tokens[i] == tok!"inout") && tokens[i + 1] == tok!"(")
 		{
 			writeToken(output, tokens[i]);
 			i++;
@@ -185,7 +179,9 @@ void upgradeFile(string fileName, bool dip64, bool dip65, bool dip1003)
 				}
 			}
 		}
+
 		skipWhitespace(output, tokens, i);
+
 		// print out suffixes
 		while (i < tokens.length && (tokens[i] == tok!"*" || tokens[i] == tok!"["))
 		{
@@ -205,77 +201,80 @@ void upgradeFile(string fileName, bool dip64, bool dip65, bool dip1003)
 		{
 			with (SpecialMarkerType) final switch (marker.type)
 			{
-			case bodyEnd:
-				if (tokens[i].index != marker.index)
-					break;
-				assert (tokens[i].type == tok!"}", format("%d %s", tokens[i].line, str(tokens[i].type)));
-				writeToken(output, tokens[i]);
-				i++;
-				if (i < tokens.length && tokens[i] == tok!";")
+				case bodyEnd:
+					if (tokens[i].index != marker.index)
+						break;
+					assert (tokens[i].type == tok!"}", format("%d %s", tokens[i].line, str(tokens[i].type)));
+					writeToken(output, tokens[i]);
 					i++;
-				markers = markers[1 .. $];
-				break markerLoop;
-			case functionAttributePrefix:
-				if (tokens[i].index != marker.index)
-					break;
-				// skip over token to be moved
-				i++;
-				skipWhitespace(output, tokens, i, false);
-
-				// skip over function return type
-				writeType(output, tokens, i);
-				skipWhitespace(output, tokens, i);
-
-				// skip over function name
-				skipIdentifierChain(output, tokens, i, true);
-				skipWhitespace(output, tokens, i, false);
-
-				// skip first paramters
-				skipAndWrite!("(", ")")(output, tokens, i);
-
-				immutable bookmark = i;
-				skipWhitespace(output, tokens, i, false);
-
-				// If there is a second set of parameters, go back to the bookmark
-				// and print out the whitespace
-				if (i < tokens.length && tokens[i] == tok!"(")
-				{
-					i = bookmark;
-					skipWhitespace(output, tokens, i);
-					skipAndWrite!("(", ")")(output, tokens, i);
+					if (i < tokens.length && tokens[i] == tok!";")
+						i++;
+					markers = markers[1 .. $];
+					break markerLoop;
+				case functionAttributePrefix:
+					if (tokens[i].index != marker.index)
+						break;
+					// skip over token to be moved
+					i++;
 					skipWhitespace(output, tokens, i, false);
-				}
-				else
-					i = bookmark;
 
-				// write out the attribute being moved
-				output.write(" ", marker.functionAttribute);
+					// skip over function return type
+					writeType(output, tokens, i);
+					skipWhitespace(output, tokens, i);
 
-				// if there was no whitespace, add it after the moved attribute
-				if (i < tokens.length && tokens[i] != tok!"whitespace" && tokens[i] != tok!";")
-					output.write(" ");
+					// skip over function name
+					skipIdentifierChain(output, tokens, i, true);
+					skipWhitespace(output, tokens, i, false);
 
-				markers = markers[1 .. $];
-				break markerLoop;
-			case cStyleArray:
-				if (i != marker.index)
-					break;
-				formatter.sink = output.lockingTextWriter();
-				foreach (node; retro(marker.nodes))
-					formatter.format(node);
-				formatter.sink = File.LockingTextWriter.init;
-				skipWhitespace(output, tokens, i);
-				writeToken(output, tokens[i]);
-				i++;
-				suffixLoop: while (i < tokens.length) switch (tokens[i].type)
-				{
-					case tok!"(": skipAndWrite!("(", ")")(output, tokens, i); break;
-					case tok!"[": skip!("[", "]")(tokens, i); break;
-					case tok!"*": i++; break;
-					default: break suffixLoop;
-				}
-				markers = markers[1 .. $];
-				break markerLoop;
+					// skip first paramters
+					skipAndWrite!("(", ")")(output, tokens, i);
+
+					immutable bookmark = i;
+					skipWhitespace(output, tokens, i, false);
+
+					// If there is a second set of parameters, go back to the bookmark
+					// and print out the whitespace
+					if (i < tokens.length && tokens[i] == tok!"(")
+					{
+						i = bookmark;
+						skipWhitespace(output, tokens, i);
+						skipAndWrite!("(", ")")(output, tokens, i);
+						skipWhitespace(output, tokens, i, false);
+					}
+					else
+						i = bookmark;
+
+					// write out the attribute being moved
+					output.write(" ", marker.functionAttribute);
+
+					// if there was no whitespace, add it after the moved attribute
+					if (i < tokens.length && tokens[i] != tok!"whitespace" && tokens[i] != tok!";")
+						output.write(" ");
+
+					markers = markers[1 .. $];
+					break markerLoop;
+				case cStyleArray:
+					if (i != marker.index)
+						break;
+					formatter.sink = output.lockingTextWriter();
+					foreach (node; retro(marker.nodes))
+						formatter.format(node);
+					formatter.sink = File.LockingTextWriter.init;
+					skipWhitespace(output, tokens, i);
+					writeToken(output, tokens[i]);
+					i++;
+					suffixLoop: while (i < tokens.length) switch (tokens[i].type)
+					{
+						case tok!"(":
+							skipAndWrite!("(", ")")(output, tokens, i); break;
+						case tok!"[":
+							skip!("[", "]")(tokens, i); break;
+						case tok!"*":
+							i++; break;
+						default: break suffixLoop;
+					}
+					markers = markers[1 .. $];
+					break markerLoop;
 			}
 		}
 
@@ -284,316 +283,316 @@ void upgradeFile(string fileName, bool dip64, bool dip65, bool dip1003)
 
 		switch (tokens[i].type)
 		{
-		case tok!"asm":
-			skipAsmBlock(output, tokens, i);
-			goto default;
-		case tok!"catch":
-			if (!dip65)
+			case tok!"asm":
+				skipAsmBlock(output, tokens, i);
 				goto default;
-			size_t j = i + 1;
-			while (j < tokens.length && (tokens[j] == tok!"whitespace" || tokens[j] == tok!"comment"))
-				j++;
-			if (j < tokens.length && tokens[j].type != tok!"(")
-			{
-				output.write("catch (Throwable)");
-				break;
-			}
-			else
-				goto default;
-		case tok!"deprecated":
-			if (dip64)
-				output.write("@");
-			output.writeToken(tokens[i]);
-			i++;
-			if (i < tokens.length && tokens[i] == tok!"(")
-				skipAndWrite!("(", ")")(output, tokens, i);
-			if (i < tokens.length)
-				goto default;
-			else
-				break;
-		case tok!"stringLiteral":
-			immutable size_t stringBookmark = i;
-			while (tokens[i] == tok!"stringLiteral")
-			{
-				i++;
-				skipWhitespace(output, tokens, i, false);
-			}
-			immutable bool parensNeeded = stringBookmark + 1 != i && tokens[i] == tok!".";
-			i = stringBookmark;
-			if (parensNeeded)
-				output.write("(");
-			output.writeToken(tokens[i]);
-			i++;
-			skipWhitespace(output, tokens, i);
-			while (tokens[i] == tok!"stringLiteral")
-			{
-				output.write("~ ");
+			case tok!"catch":
+				if (!dip65)
+					goto default;
+				size_t j = i + 1;
+				while (j < tokens.length && (tokens[j] == tok!"whitespace" || tokens[j] == tok!"comment"))
+					j++;
+				if (j < tokens.length && tokens[j].type != tok!"(")
+				{
+					output.write("catch (Throwable)");
+					break;
+				}
+				else
+					goto default;
+			case tok!"deprecated":
+				if (dip64)
+					output.write("@");
 				output.writeToken(tokens[i]);
 				i++;
-				skipWhitespace(output, tokens, i);
-			}
-			if (parensNeeded)
-				output.write(")");
-			if (i < tokens.length)
-				goto default;
-			else
-				break;
-		case tok!"override":
-		case tok!"final":
-		case tok!"abstract":
-		case tok!"align":
-		case tok!"pure":
-		case tok!"nothrow":
-			if (!dip64)
-				goto default;
-			output.write("@");
-			output.write(str(tokens[i].type));
-			break;
-		case tok!"alias":
-			bool multipleAliases = false;
-			bool oldStyle = true;
-			output.writeToken(tokens[i]); // alias
-				i++;
-			size_t j = i + 1;
-
-			int depth;
-			loop: while (j < tokens.length) switch (tokens[j].type)
-			{
-			case tok!"(":
-				depth++;
-				j++;
-				break;
-			case tok!")":
-				depth--;
-				if (depth < 0)
-				{
-					oldStyle = false;
-					break loop;
-				}
-				j++;
-				break;
-			case tok!"=":
-			case tok!"this":
-				j++;
-				oldStyle = false;
-				break;
-			case tok!",":
-				j++;
-				if (depth == 0)
-					multipleAliases = true;
-				break;
-			case tok!";":
-				break loop;
-			default:
-				j++;
-				break;
-			}
-
-			if (!oldStyle) foreach (k; i .. j + 1)
-			{
-				output.writeToken(tokens[k]);
-				i = k;
-			}
-			else
-			{
-				skipWhitespace(output, tokens, i);
-
-				size_t beforeStart = i;
-				size_t beforeEnd = beforeStart;
-
-				loop2: while (beforeEnd < tokens.length) switch (tokens[beforeEnd].type)
-				{
-				case tok!"bool":
-				case tok!"byte":
-				case tok!"ubyte":
-				case tok!"short":
-				case tok!"ushort":
-				case tok!"int":
-				case tok!"uint":
-				case tok!"long":
-				case tok!"ulong":
-				case tok!"char":
-				case tok!"wchar":
-				case tok!"dchar":
-				case tok!"float":
-				case tok!"double":
-				case tok!"real":
-				case tok!"ifloat":
-				case tok!"idouble":
-				case tok!"ireal":
-				case tok!"cfloat":
-				case tok!"cdouble":
-				case tok!"creal":
-				case tok!"void":
-					beforeEnd++;
-					break loop2;
-				case tok!".":
-					beforeEnd++;
-					goto case;
-				case tok!"identifier":
-					skipIdentifierChain(output, tokens, beforeEnd);
-					break loop2;
-				case tok!"typeof":
-					beforeEnd++;
-					skip!("(", ")")(tokens, beforeEnd);
-					skipWhitespace(output, tokens, beforeEnd, false);
-					if (tokens[beforeEnd] == tok!".")
-						skipIdentifierChain(output, tokens, beforeEnd);
-					break loop2;
-				case tok!"@":
-					beforeEnd++;
-					if (tokens[beforeEnd] == tok!"identifier")
-						beforeEnd++;
-					if (tokens[beforeEnd] == tok!"(")
-						skip!("(", ")")(tokens, beforeEnd);
-					skipWhitespace(output, tokens, beforeEnd, false);
+				if (i < tokens.length && tokens[i] == tok!"(")
+					skipAndWrite!("(", ")")(output, tokens, i);
+				if (i < tokens.length)
+					goto default;
+				else
 					break;
-				case tok!"static":
-				case tok!"const":
-				case tok!"immutable":
-				case tok!"inout":
-				case tok!"shared":
-				case tok!"extern":
-				case tok!"nothrow":
-				case tok!"pure":
-				case tok!"__vector":
-					beforeEnd++;
-					skipWhitespace(output, tokens, beforeEnd, false);
-					if (tokens[beforeEnd] == tok!"(")
-						skip!("(", ")")(tokens, beforeEnd);
-					if (beforeEnd >= tokens.length)
-						break loop2;
-					size_t k = beforeEnd;
-					skipWhitespace(output, tokens, k, false);
-					if (k + 1 < tokens.length && tokens[k + 1].type == tok!";")
-						break loop2;
-					else
-						beforeEnd = k;
-					break;
-				default:
-					break loop2;
-				}
-
-				i = beforeEnd;
-
-				skipWhitespace(output, tokens, i, false);
-
-				if (tokens[i] == tok!"*" || tokens[i] == tok!"["
-					|| tokens[i] == tok!"function" || tokens[i] == tok!"delegate")
-				{
-					beforeEnd = i;
-				}
-
-				loop3: while (beforeEnd < tokens.length) switch (tokens[beforeEnd].type)
-				{
-				case tok!"*":
-					beforeEnd++;
-					size_t m = beforeEnd;
-					skipWhitespace(output, tokens, m, false);
-					if (m < tokens.length && (tokens[m] == tok!"*"
-						|| tokens[m] == tok!"[" || tokens[m] == tok!"function"
-						|| tokens[m] == tok!"delegate"))
-					{
-						beforeEnd = m;
-					}
-					break;
-				case tok!"[":
-					skip!("[", "]")(tokens, beforeEnd);
-					size_t m = beforeEnd;
-					skipWhitespace(output, tokens, m, false);
-					if (m < tokens.length && (tokens[m] == tok!"*"
-						|| tokens[m] == tok!"[" || tokens[m] == tok!"function"
-						|| tokens[m] == tok!"delegate"))
-					{
-						beforeEnd = m;
-					}
-					break;
-				case tok!"function":
-				case tok!"delegate":
-					beforeEnd++;
-					skipWhitespace(output, tokens, beforeEnd, false);
-					skip!("(", ")")(tokens, beforeEnd);
-					size_t l = beforeEnd;
-					skipWhitespace(output, tokens, l, false);
-					loop4: while (l < tokens.length) switch (tokens[l].type)
-					{
-					case tok!"const":
-					case tok!"nothrow":
-					case tok!"pure":
-					case tok!"immutable":
-					case tok!"inout":
-					case tok!"shared":
-						beforeEnd = l + 1;
-						l = beforeEnd;
-						skipWhitespace(output, tokens, l, false);
-						if (l < tokens.length && tokens[l].type == tok!"identifier")
-						{
-							beforeEnd = l - 1;
-							break loop4;
-						}
-						break;
-					case tok!"@":
-						beforeEnd = l + 1;
-						skipWhitespace(output, tokens, beforeEnd, false);
-						if (tokens[beforeEnd] == tok!"(")
-							skip!("(", ")")(tokens, beforeEnd);
-						else
-						{
-							beforeEnd++; // identifier
-							skipWhitespace(output, tokens, beforeEnd, false);
-							if (tokens[beforeEnd] == tok!"(")
-								skip!("(", ")")(tokens, beforeEnd);
-						}
-						l = beforeEnd;
-						skipWhitespace(output, tokens, l, false);
-						if (l < tokens.length && tokens[l].type == tok!"identifier")
-						{
-							beforeEnd = l - 1;
-							break loop4;
-						}
-						break;
-					default:
-						break loop4;
-					}
-					break;
-				default:
-					break loop3;
-				}
-
-				i = beforeEnd;
-				skipWhitespace(output, tokens, i, false);
-
-				output.writeToken(tokens[i]);
-				output.write(" = ");
-				foreach (l; beforeStart .. beforeEnd)
-					output.writeToken(tokens[l]);
-
-				if (multipleAliases)
+			case tok!"stringLiteral":
+				immutable size_t stringBookmark = i;
+				while (tokens[i] == tok!"stringLiteral")
 				{
 					i++;
 					skipWhitespace(output, tokens, i, false);
-					while (tokens[i] == tok!",")
+				}
+				immutable bool parensNeeded = stringBookmark + 1 != i && tokens[i] == tok!".";
+				i = stringBookmark;
+				if (parensNeeded)
+					output.write("(");
+				output.writeToken(tokens[i]);
+				i++;
+				skipWhitespace(output, tokens, i);
+				while (tokens[i] == tok!"stringLiteral")
+				{
+					output.write("~ ");
+					output.writeToken(tokens[i]);
+					i++;
+					skipWhitespace(output, tokens, i);
+				}
+				if (parensNeeded)
+					output.write(")");
+				if (i < tokens.length)
+					goto default;
+				else
+					break;
+			case tok!"override":
+			case tok!"final":
+			case tok!"abstract":
+			case tok!"align":
+			case tok!"pure":
+			case tok!"nothrow":
+				if (!dip64)
+					goto default;
+				output.write("@");
+				output.write(str(tokens[i].type));
+				break;
+			case tok!"alias":
+				bool multipleAliases = false;
+				bool oldStyle = true;
+				output.writeToken(tokens[i]); // alias
+				i++;
+				size_t j = i + 1;
+
+				int depth;
+				loop: while (j < tokens.length) switch (tokens[j].type)
+				{
+					case tok!"(":
+						depth++;
+						j++;
+						break;
+					case tok!")":
+						depth--;
+						if (depth < 0)
+						{
+							oldStyle = false;
+							break loop;
+						}
+						j++;
+						break;
+					case tok!"=":
+					case tok!"this":
+						j++;
+						oldStyle = false;
+						break;
+					case tok!",":
+						j++;
+						if (depth == 0)
+							multipleAliases = true;
+						break;
+					case tok!";":
+						break loop;
+					default:
+						j++;
+						break;
+				}
+
+				if (!oldStyle) foreach (k; i .. j + 1)
+				{
+					output.writeToken(tokens[k]);
+					i = k;
+				}
+				else
+				{
+					skipWhitespace(output, tokens, i);
+
+					size_t beforeStart = i;
+					size_t beforeEnd = beforeStart;
+
+					loop2: while (beforeEnd < tokens.length) switch (tokens[beforeEnd].type)
 					{
-						i++; // ,
-						output.write(", ");
+						case tok!"bool":
+						case tok!"byte":
+						case tok!"ubyte":
+						case tok!"short":
+						case tok!"ushort":
+						case tok!"int":
+						case tok!"uint":
+						case tok!"long":
+						case tok!"ulong":
+						case tok!"char":
+						case tok!"wchar":
+						case tok!"dchar":
+						case tok!"float":
+						case tok!"double":
+						case tok!"real":
+						case tok!"ifloat":
+						case tok!"idouble":
+						case tok!"ireal":
+						case tok!"cfloat":
+						case tok!"cdouble":
+						case tok!"creal":
+						case tok!"void":
+							beforeEnd++;
+							break loop2;
+						case tok!".":
+							beforeEnd++;
+							goto case;
+						case tok!"identifier":
+							skipIdentifierChain(output, tokens, beforeEnd);
+							break loop2;
+						case tok!"typeof":
+							beforeEnd++;
+							skip!("(", ")")(tokens, beforeEnd);
+							skipWhitespace(output, tokens, beforeEnd, false);
+							if (tokens[beforeEnd] == tok!".")
+								skipIdentifierChain(output, tokens, beforeEnd);
+							break loop2;
+						case tok!"@":
+							beforeEnd++;
+							if (tokens[beforeEnd] == tok!"identifier")
+								beforeEnd++;
+							if (tokens[beforeEnd] == tok!"(")
+								skip!("(", ")")(tokens, beforeEnd);
+							skipWhitespace(output, tokens, beforeEnd, false);
+							break;
+						case tok!"static":
+						case tok!"const":
+						case tok!"immutable":
+						case tok!"inout":
+						case tok!"shared":
+						case tok!"extern":
+						case tok!"nothrow":
+						case tok!"pure":
+						case tok!"__vector":
+							beforeEnd++;
+							skipWhitespace(output, tokens, beforeEnd, false);
+							if (tokens[beforeEnd] == tok!"(")
+								skip!("(", ")")(tokens, beforeEnd);
+							if (beforeEnd >= tokens.length)
+								break loop2;
+							size_t k = beforeEnd;
+							skipWhitespace(output, tokens, k, false);
+							if (k + 1 < tokens.length && tokens[k + 1].type == tok!";")
+								break loop2;
+							else
+								beforeEnd = k;
+							break;
+						default:
+							break loop2;
+					}
+
+					i = beforeEnd;
+
+					skipWhitespace(output, tokens, i, false);
+
+					if (tokens[i] == tok!"*" || tokens[i] == tok!"["
+					|| tokens[i] == tok!"function" || tokens[i] == tok!"delegate")
+					{
+						beforeEnd = i;
+					}
+
+					loop3: while (beforeEnd < tokens.length) switch (tokens[beforeEnd].type)
+					{
+						case tok!"*":
+							beforeEnd++;
+							size_t m = beforeEnd;
+							skipWhitespace(output, tokens, m, false);
+							if (m < tokens.length && (tokens[m] == tok!"*"
+							|| tokens[m] == tok!"[" || tokens[m] == tok!"function"
+							|| tokens[m] == tok!"delegate"))
+							{
+								beforeEnd = m;
+							}
+							break;
+						case tok!"[":
+							skip!("[", "]")(tokens, beforeEnd);
+							size_t m = beforeEnd;
+							skipWhitespace(output, tokens, m, false);
+							if (m < tokens.length && (tokens[m] == tok!"*"
+							|| tokens[m] == tok!"[" || tokens[m] == tok!"function"
+							|| tokens[m] == tok!"delegate"))
+							{
+								beforeEnd = m;
+							}
+							break;
+						case tok!"function":
+						case tok!"delegate":
+							beforeEnd++;
+							skipWhitespace(output, tokens, beforeEnd, false);
+							skip!("(", ")")(tokens, beforeEnd);
+							size_t l = beforeEnd;
+							skipWhitespace(output, tokens, l, false);
+							loop4: while (l < tokens.length) switch (tokens[l].type)
+							{
+								case tok!"const":
+								case tok!"nothrow":
+								case tok!"pure":
+								case tok!"immutable":
+								case tok!"inout":
+								case tok!"shared":
+									beforeEnd = l + 1;
+									l = beforeEnd;
+									skipWhitespace(output, tokens, l, false);
+									if (l < tokens.length && tokens[l].type == tok!"identifier")
+									{
+										beforeEnd = l - 1;
+										break loop4;
+									}
+									break;
+								case tok!"@":
+									beforeEnd = l + 1;
+									skipWhitespace(output, tokens, beforeEnd, false);
+									if (tokens[beforeEnd] == tok!"(")
+										skip!("(", ")")(tokens, beforeEnd);
+									else
+									{
+										beforeEnd++; // identifier
+										skipWhitespace(output, tokens, beforeEnd, false);
+										if (tokens[beforeEnd] == tok!"(")
+											skip!("(", ")")(tokens, beforeEnd);
+									}
+									l = beforeEnd;
+									skipWhitespace(output, tokens, l, false);
+									if (l < tokens.length && tokens[l].type == tok!"identifier")
+									{
+										beforeEnd = l - 1;
+										break loop4;
+									}
+									break;
+								default:
+									break loop4;
+							}
+							break;
+						default:
+							break loop3;
+					}
+
+					i = beforeEnd;
+					skipWhitespace(output, tokens, i, false);
+
+					output.writeToken(tokens[i]);
+					output.write(" = ");
+					foreach (l; beforeStart .. beforeEnd)
+						output.writeToken(tokens[l]);
+
+					if (multipleAliases)
+					{
+						i++;
 						skipWhitespace(output, tokens, i, false);
-						output.writeToken(tokens[i]);
-						output.write(" = ");
-						foreach (l; beforeStart .. beforeEnd)
-							output.writeToken(tokens[l]);
+						while (tokens[i] == tok!",")
+						{
+							i++; // ,
+							output.write(", ");
+							skipWhitespace(output, tokens, i, false);
+							output.writeToken(tokens[i]);
+							output.write(" = ");
+							foreach (l; beforeStart .. beforeEnd)
+								output.writeToken(tokens[l]);
+						}
 					}
 				}
-			}
-			break;
-		case tok!"identifier":
-			if (tokens[i].text == "body")
-				(dip1003 && tokens.isBodyKw(i)) ? output.write("do") : output.write("body");
-			else
-				goto default;
-			break;
-		default:
-			output.writeToken(tokens[i]);
-			break;
+				break;
+			case tok!"identifier":
+				if (tokens[i].text == "body")
+						(dip1003 && tokens.isBodyKw(i)) ? output.write("do") : output.write("body");
+				else
+					goto default;
+				break;
+			default:
+				output.writeToken(tokens[i]);
+				break;
 		}
 	}
 }
@@ -608,9 +607,11 @@ void relocateMarkers(SpecialMarker[] markers, const(Token)[] tokens) pure nothro
 	{
 		if (marker.type != SpecialMarkerType.cStyleArray)
 			continue;
+
 		size_t index = 0;
 		while (tokens[index].index != marker.index)
 			index++;
+
 		marker.index = index - 1;
 	}
 }
@@ -628,22 +629,23 @@ void skipAndWrite(alias Open, alias Close)(File output, const(Token)[] tokens, r
 	int depth = 1;
 	writeToken(output, tokens[index]);
 	index++;
+
 	while (index < tokens.length && depth > 0) switch (tokens[index].type)
 	{
-	case tok!Open:
-		depth++;
-		writeToken(output, tokens[index]);
-		index++;
-		break;
-	case tok!Close:
-		depth--;
-		writeToken(output, tokens[index]);
-		index++;
-		break;
-	default:
-		writeToken(output, tokens[index]);
-		index++;
-		break;
+		case tok!Open:
+			depth++;
+			writeToken(output, tokens[index]);
+			index++;
+			break;
+		case tok!Close:
+			depth--;
+			writeToken(output, tokens[index]);
+			index++;
+			break;
+		default:
+			writeToken(output, tokens[index]);
+			index++;
+			break;
 	}
 }
 
@@ -654,7 +656,8 @@ bool isBodyKw(const(Token)[] tokens, size_t index)
 {
 	assert(index);
 	index -= 1;
-	L0: while (index--) switch (tokens[index].type)
+
+	while (index--) switch (tokens[index].type)
 	{
 		// `in {} body {}`
 		case tok!"}":
@@ -676,8 +679,9 @@ bool isBodyKw(const(Token)[] tokens, size_t index)
 		case tok!"scope":
 			return true;
 		default:
-			break L0;
+			return false;
 	}
+
 	return false;
 }
 
@@ -689,11 +693,20 @@ void skip(alias Open, alias Close)(const(Token)[] tokens, ref size_t index)
 {
 	int depth = 1;
 	index++;
+
 	while (index < tokens.length && depth > 0) switch (tokens[index].type)
 	{
-	case tok!Open: depth++;  index++; break;
-	case tok!Close: depth--; index++; break;
-	default:                 index++; break;
+		case tok!Open:
+			depth++;
+			index++;
+			break;
+		case tok!Close:
+			depth--;
+			index++;
+			break;
+		default:
+			index++;
+			break;
 	}
 }
 
@@ -705,7 +718,9 @@ void skipWhitespace(File output, const(Token)[] tokens, ref size_t index, bool p
 {
 	while (index < tokens.length && (tokens[index] == tok!"whitespace" || tokens[index] == tok!"comment"))
 	{
-		if (print) output.writeToken(tokens[index]);
+		if (print)
+			output.writeToken(tokens[index]);
+
 		index++;
 	}
 }
@@ -716,51 +731,52 @@ void skipWhitespace(File output, const(Token)[] tokens, ref size_t index, bool p
  */
 void skipIdentifierChain(File output, const(Token)[] tokens, ref size_t index, bool print = false)
 {
-	loop: while (index < tokens.length) switch (tokens[index].type)
+	while (index < tokens.length) switch (tokens[index].type)
 	{
-	case tok!".":
-		if (print)
-			writeToken(output, tokens[index]);
-		index++;
-		skipWhitespace(output, tokens, index, false);
-		break;
-	case tok!"identifier":
-		if (print)
-			writeToken(output, tokens[index]);
-		index++;
-		size_t i = index;
-		skipWhitespace(output, tokens, i, false);
-		if (tokens[i] == tok!"!")
-		{
-			i++;
+		case tok!".":
 			if (print)
 				writeToken(output, tokens[index]);
 			index++;
+			skipWhitespace(output, tokens, index, false);
+			break;
+		case tok!"identifier":
+			if (print)
+				writeToken(output, tokens[index]);
+			index++;
+			size_t i = index;
 			skipWhitespace(output, tokens, i, false);
-			if (tokens[i] == tok!"(")
-			{
-				if (print)
-					skipAndWrite!("(", ")")(output, tokens, i);
-				else
-					skip!("(", ")")(tokens, i);
-				index = i;
-			}
-			else
+			if (tokens[i] == tok!"!")
 			{
 				i++;
 				if (print)
 					writeToken(output, tokens[index]);
 				index++;
+				skipWhitespace(output, tokens, i, false);
+				if (tokens[i] == tok!"(")
+				{
+					if (print)
+						skipAndWrite!("(", ")")(output, tokens, i);
+					else
+						skip!("(", ")")(tokens, i);
+					index = i;
+				}
+				else
+				{
+					i++;
+					if (print)
+						writeToken(output, tokens[index]);
+					index++;
+				}
 			}
-		}
-		if (tokens[i] != tok!".")
-			break loop;
-		break;
-	case tok!"whitespace":
-		index++;
-		break;
-	default:
-		break loop;
+			if (tokens[i] != tok!".")
+				return;
+
+			break;
+		case tok!"whitespace":
+			index++;
+			break;
+		default:
+			return;
 	}
 }
 
@@ -771,41 +787,43 @@ void skipAttribute(File output, const(Token)[] tokens, ref size_t i)
 {
 	switch (tokens[i].type)
 	{
-	case tok!"@":
-		output.writeToken(tokens[i]);
-		i++; // @
-		skipWhitespace(output, tokens, i, true);
-		switch (tokens[i].type)
-		{
-		case tok!"identifier":
+		case tok!"@":
 			output.writeToken(tokens[i]);
-			i++; // identifier
+			i++; // @
 			skipWhitespace(output, tokens, i, true);
-			if (tokens[i].type == tok!"(")
-				goto case tok!"(";
+			switch (tokens[i].type)
+			{
+				case tok!"identifier":
+					output.writeToken(tokens[i]);
+					i++; // identifier
+					skipWhitespace(output, tokens, i, true);
+					if (tokens[i].type == tok!"(")
+						goto case tok!"(";
+					break;
+				case tok!"(":
+					int depth = 1;
+					output.writeToken(tokens[i]);
+					i++;
+					while (i < tokens.length && depth > 0) switch (tokens[i].type)
+					{
+						case tok!"(":
+							depth++; output.writeToken(tokens[i]); i++; break;
+						case tok!")":
+							depth--; output.writeToken(tokens[i]); i++; break;
+						default:               output.writeToken(tokens[i]); i++; break;
+					}
+					break;
+				default:
+					break;
+			}
 			break;
-		case tok!"(":
-			int depth = 1;
+		case tok!"nothrow":
+		case tok!"pure":
 			output.writeToken(tokens[i]);
 			i++;
-			while (i < tokens.length && depth > 0) switch (tokens[i].type)
-			{
-			case tok!"(": depth++; output.writeToken(tokens[i]); i++; break;
-			case tok!")": depth--; output.writeToken(tokens[i]); i++; break;
-			default:               output.writeToken(tokens[i]); i++; break;
-			}
 			break;
 		default:
 			break;
-		}
-		break;
-	case tok!"nothrow":
-	case tok!"pure":
-		output.writeToken(tokens[i]);
-		i++;
-		break;
-	default:
-		break;
 	}
 }
 
@@ -819,40 +837,49 @@ void skipAsmBlock(File output, const(Token)[] tokens, ref size_t i)
 	output.write("asm");
 	i++; // asm
 	skipWhitespace(output, tokens, i);
+
 	loop: while (true) switch (tokens[i].type)
 	{
-	case tok!"@":
-	case tok!"nothrow":
-	case tok!"pure":
-		skipAttribute(output, tokens, i);
-		skipWhitespace(output, tokens, i);
-		break;
-	case tok!"{":
-		break loop;
-	default:
-		break loop;
+		case tok!"@":
+		case tok!"nothrow":
+		case tok!"pure":
+			skipAttribute(output, tokens, i);
+			skipWhitespace(output, tokens, i);
+			break;
+		case tok!"{":
+			break loop;
+		default:
+			break loop;
 	}
+
 	enforce(tokens[i].type == tok!"{");
 	output.write("{");
+
 	i++; // {
 	int depth = 1;
+
 	while (depth > 0 && i < tokens.length) switch (tokens[i].type)
 	{
-	case tok!"{": depth++; goto default;
-	case tok!"}": depth--; goto default;
-	default: writeToken(output, tokens[i]); i++; break;
+		case tok!"{":
+			depth++; goto default;
+		case tok!"}":
+			depth--; goto default;
+		default:
+			writeToken(output, tokens[i]);
+			i++;
+			break;
 	}
 }
 
 /**
  * Dummy message output function for the lexer/parser
  */
-void reportErrors(string fileName, size_t lineNumber, size_t columnNumber,
-	string message, bool isError)
+void reportErrors(string fileName, size_t lineNumber, size_t columnNumber, string message, bool isError)
 {
 	import std.stdio : stderr;
 
 	if (!isError)
 		return;
+
 	stderr.writefln("%s(%d:%d)[error]: %s", fileName, lineNumber, columnNumber, message);
 }
