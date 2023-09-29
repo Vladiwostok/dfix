@@ -3,6 +3,7 @@ module dfixvisitor;
 import markers;
 import dparse.ast;
 import dparse.lexer;
+import std.algorithm;
 
 /**
  * Scans a module's parsed AST and looks for C-style array variables and
@@ -21,17 +22,20 @@ class DFixVisitor : ASTVisitor
 		if (varDec.declarators.length == 0)
 			return;
 
-		markers ~= SpecialMarker(SpecialMarkerType.cStyleArray,
-		varDec.declarators[0].name.index, varDec.declarators[0].cstyle);
+		markers ~= SpecialMarker(
+			SpecialMarkerType.cStyleArray,
+			varDec.declarators[0].name.index,
+			varDec.declarators[0].cstyle
+		);
 	}
 
 	// C-style array parameters
 	override void visit(const Parameter param)
 	{
+		param.accept(this);
+
 		if (param.cstyle.length > 0)
 			markers ~= SpecialMarker(SpecialMarkerType.cStyleArray, param.name.index, param.cstyle);
-
-		param.accept(this);
 	}
 
 	// interface, union, class, struct body closing braces
@@ -54,27 +58,26 @@ class DFixVisitor : ASTVisitor
 	}
 
 	// Confusing placement of function attributes
-	override void visit(const Declaration dec)
+	override void visit(const Declaration decl)
 	{
-		if (dec.functionDeclaration is null)
-			goto end;
+		decl.accept(this);
 
-		if (dec.attributes.length == 0)
-			goto end;
+		if (decl.functionDeclaration is null || decl.attributes.length == 0)
+			return;
 
-		foreach (attr; dec.attributes)
-		{
-			if (attr.attribute == tok!"")
-				continue;
-
-			if (attr.attribute == tok!"const" || attr.attribute == tok!"inout" || attr.attribute == tok!"immutable")
-			{
-				markers ~= SpecialMarker(SpecialMarkerType.functionAttributePrefix,
-				attr.attribute.index, null, str(attr.attribute.type));
-			}
-		}
-
-		end:
-			dec.accept(this);
+		decl.attributes.filter!(
+			attr => attr.attribute == tok!"const" || attr.attribute == tok!"inout" || attr.attribute == tok!"immutable"
+		)
+		.each!(
+			attr => markers ~= SpecialMarker(
+				SpecialMarkerType.functionAttributePrefix,
+				attr.attribute.index,
+				null,
+				str(attr.attribute.type)
+			)
+		);
 	}
+
+	private:
+
 }
