@@ -3,6 +3,18 @@ module dfixutils;
 import std.stdio : File;
 import dparse.lexer : Token;
 
+ubyte[] readFile(string fileName)
+{
+	import std.array : uninitializedArray;
+
+	File file = File(fileName, "rb");
+	ubyte[] fileContent = uninitializedArray!(ubyte[])(cast(size_t) file.size);
+	file.rawRead(fileContent);
+	file.close();
+
+	return fileContent;
+}
+
 /**
  * Writes a token to the output file.
  */

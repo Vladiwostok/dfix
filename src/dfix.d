@@ -87,15 +87,13 @@ void upgradeFile(string fileName, bool dip64, bool dip65, bool dip1003)
 	import dparse.rollback_allocator : RollbackAllocator;
 	import std.functional : toDelegate;
 
-	File input = File(fileName, "rb");
-	ubyte[] inputBytes = uninitializedArray!(ubyte[])(cast(size_t) input.size);
-	input.rawRead(inputBytes);
-	input.close();
+	ubyte[] fileBytes = readFile(fileName);
+
 	StringCache cache = StringCache(StringCache.defaultBucketCount);
 	LexerConfig config;
 	config.fileName = fileName;
 	config.stringBehavior = StringBehavior.source;
-	auto tokens = byToken(inputBytes, config, &cache).array;
+	auto tokens = byToken(fileBytes, config, &cache).array;
 	auto parseTokens = tokens.filter!(
 		a => a != tok!"whitespace" && a != tok!"comment" && a != tok!"specialTokenSequence"
 	).array;
