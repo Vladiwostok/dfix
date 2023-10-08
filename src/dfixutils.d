@@ -24,6 +24,56 @@ void writeToken(File output, ref const(Token) token)
 	output.write(token.text is null ? str(token.type) : token.text);
 }
 
+void writeType(T)(File output, T tokens, ref size_t i)
+{
+	import dparse.lexer, skiputils;
+
+	if (isBasicType(tokens[i].type))
+	{
+		writeToken(output, tokens[i]);
+		i++;
+	}
+	else if ((tokens[i] == tok!"const" || tokens[i] == tok!"immutable" || tokens[i] == tok!"shared"
+	|| tokens[i] == tok!"inout") && tokens[i + 1] == tok!"(")
+	{
+		writeToken(output, tokens[i]);
+		i++;
+		skipAndWrite!("(", ")")(output, tokens, i);
+	}
+	else
+	{
+		skipIdentifierChain(output, tokens, i, true);
+		if (i < tokens.length && tokens[i] == tok!"!")
+		{
+			writeToken(output, tokens[i]);
+			i++;
+			if (i + 1 < tokens.length && tokens[i + 1] == tok!"(")
+				skipAndWrite!("(", ")")(output, tokens, i);
+			else if (tokens[i].type == tok!"identifier")
+				skipIdentifierChain(output, tokens, i, true);
+			else
+			{
+				writeToken(output, tokens[i]);
+				i++;
+			}
+		}
+	}
+
+	skipWhitespace(output, tokens, i);
+
+	// print out suffixes
+	while (i < tokens.length && (tokens[i] == tok!"*" || tokens[i] == tok!"["))
+	{
+		if (tokens[i] == tok!"*")
+		{
+			writeToken(output, tokens[i]);
+			i++;
+		}
+		else if (tokens[i] == tok!"[")
+			skipAndWrite!("[", "]")(output, tokens, i);
+	}
+}
+
 /**
  * Prints help message
  */

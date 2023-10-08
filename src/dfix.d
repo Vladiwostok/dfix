@@ -103,8 +103,7 @@ void upgradeFile(string fileName, bool dip64, bool dip65, bool dip1003)
 	auto mod = parseModule(parseTokens, fileName, &allocator, toDelegate(&reportErrors), &errorCount);
 	if (errorCount > 0)
 	{
-		stderr.writefln("%d parse errors encountered. Aborting upgrade of %s",
-		errorCount, fileName);
+		stderr.writefln("%d parse errors encountered. Aborting upgrade of %s", errorCount, fileName);
 		return;
 	}
 
@@ -116,54 +115,6 @@ void upgradeFile(string fileName, bool dip64, bool dip65, bool dip1003)
 	SpecialMarker[] markers = visitor.markers;
 
 	auto formatter = new Formatter!(File.LockingTextWriter)(File.LockingTextWriter.init);
-
-	void writeType(T)(File output, T tokens, ref size_t i)
-	{
-		if (isBasicType(tokens[i].type))
-		{
-			writeToken(output, tokens[i]);
-			i++;
-		}
-		else if ((tokens[i] == tok!"const" || tokens[i] == tok!"immutable" || tokens[i] == tok!"shared"
-		|| tokens[i] == tok!"inout") && tokens[i + 1] == tok!"(")
-		{
-			writeToken(output, tokens[i]);
-			i++;
-			skipAndWrite!("(", ")")(output, tokens, i);
-		}
-		else
-		{
-			skipIdentifierChain(output, tokens, i, true);
-			if (i < tokens.length && tokens[i] == tok!"!")
-			{
-				writeToken(output, tokens[i]);
-				i++;
-				if (i + 1 < tokens.length && tokens[i + 1] == tok!"(")
-					skipAndWrite!("(", ")")(output, tokens, i);
-				else if (tokens[i].type == tok!"identifier")
-					skipIdentifierChain(output, tokens, i, true);
-				else
-				{
-					writeToken(output, tokens[i]);
-					i++;
-				}
-			}
-		}
-
-		skipWhitespace(output, tokens, i);
-
-		// print out suffixes
-		while (i < tokens.length && (tokens[i] == tok!"*" || tokens[i] == tok!"["))
-		{
-			if (tokens[i] == tok!"*")
-			{
-				writeToken(output, tokens[i]);
-				i++;
-			}
-			else if (tokens[i] == tok!"[")
-				skipAndWrite!("[", "]")(output, tokens, i);
-		}
-	}
 
 	for (size_t i = 0; i < tokens.length; i++)
 	{
