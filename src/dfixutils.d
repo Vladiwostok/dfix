@@ -1,5 +1,17 @@
 module dfixutils;
 
+import std.stdio : File;
+import dparse.lexer : Token;
+
+/**
+ * Writes a token to the output file.
+ */
+void writeToken(File output, ref const(Token) token)
+{
+	import dparse.lexer : str;
+	output.write(token.text is null ? str(token.type) : token.text);
+}
+
 /**
  * Prints help message
  */
